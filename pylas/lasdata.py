@@ -14,11 +14,38 @@ from .compression import (is_point_format_compressed,
 def scale_dimension(array_dim, scale, offset):
     return (array_dim * scale) + offset
 
+def open_las(cls, source):
+    if isinstance(source, bytes):
+        return cls.from_buffer(source)
+    elif isinstance(source, str):
+        return cls.from_file(source)
+    else:
+        return cls(source)
+
+def open_from_file(cls, filename):
+    with open(filename, mode='rb') as f:
+        return cls(f)
+
+def open_from_buffer(cls, buf):
+    with io.BytesIO(buf) as stream:
+        return cls(stream)
+
+def open_las_stream(data_stream):
+    data_stream = data_stream
+    header = rawheader.RawHeader.read_from(data_stream)
+    assert data_stream.tell() == header.header_size
+
+    return LasData_1_2(header, data_stream)
+
+    # if header.version_major >= 1 and header.version_major >= 4:
+    # return LasData14
+
+
 
 class LasData:
-    def __init__(self, data_stream):
+    def __init__(self,header, data_stream):
         self.data_stream = data_stream
-        self.header = rawheader.RawHeader.read_from(self.data_stream)
+        self.header = header
         assert data_stream.tell() == self.header.header_size
         self.vlrs = vlr.VLRList.read_from(data_stream, num_to_read=self.header.number_of_vlr)
 
@@ -209,9 +236,14 @@ class LasData:
     @classmethod
     def from_file(cls, filename):
         with open(filename, mode='rb') as f:
-            return cls(f)
+            return open_las_stream(f)
 
     @classmethod
     def from_buffer(cls, buf):
         with io.BytesIO(buf) as stream:
-            return cls(stream)
+            return open_las_stream(stream)
+
+LasData_1_0 = LasData
+LasData_1_1 = LasData
+LasData_1_2 = LasData
+LasData_1_3 = LasData
